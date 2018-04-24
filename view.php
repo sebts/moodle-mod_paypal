@@ -21,7 +21,7 @@
  * if you like, and it can span multiple lines.
  *
  * @package    mod_paypal
- * @copyright  2015 Your Name
+ * @copyright  2018 SEBTS DevOps
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -42,7 +42,7 @@ if ($id) {
     $course     = $DB->get_record('course', array('id' => $paypal->course), '*', MUST_EXIST);
     $cm         = get_coursemodule_from_instance('paypal', $paypal->id, $course->id, false, MUST_EXIST);
 } else {
-    error('You must specify a course_module ID or an instance ID');
+    print_error('You must specify a course_module ID or an instance ID');
 }
 
 require_login($course, true, $cm);
@@ -71,6 +71,28 @@ $PAGE->set_heading(format_string($course->fullname));
  */
 
 // Output starts here.
+// SEBTS CSS
+echo "
+<style>
+#cardwrapper {
+    max-width: 300px;
+    border: 1px solid #d4d4d4;
+    padding: 20px 10px 10px 10px;
+    position: relative;
+    text-align: center;
+    color: #002f7a;
+    margin: 20px 0px 0px 0px;
+}
+
+    #cardwrapper #title {
+        position: absolute;
+        top: -15px;
+        left: 13px;
+        padding: 4px 12px;
+        background: #FFF;
+    }
+</style>
+";
 echo $OUTPUT->header();
 
 // Replace the following lines with you own code.
@@ -81,13 +103,15 @@ if ($paypal->intro) {
     echo $OUTPUT->box(format_module_intro('paypal', $paypal, $cm->id), 'generalbox mod_introbox', 'paypalintro');
 }
 
-if ($paymenttnx = $DB->get_record('paypal_transactions',
+if ($payment_tnx = $DB->get_record('paypal_transactions',
                                    array('userid' => $USER->id,
                                          'instanceid' => $paypal->id))) {
 
     if ($payment_tnx->payment_status == 'Completed') {
-        // should double-check with paypal everytime ?
+        echo "<hr />";
+        echo "<b>";
         echo get_string('paymentcompleted', 'paypal');
+        echo "</b>";
     } else if ($payment_tnx->payment_status == 'Pending') {
         echo get_string('paymentpending', 'paypal');
     }
@@ -102,17 +126,19 @@ if ($paymenttnx = $DB->get_record('paypal_transactions',
     if (isguestuser()) { // force login only for guest user, not real users with guest role
         if (empty($CFG->loginhttps)) {
             $wwwroot = $CFG->wwwroot;
-        } else {
+        }
+        else {
             // This actually is not so secure ;-), 'cause we're
             // in unencrypted connection...
             $wwwroot = str_replace("http://", "https://", $CFG->wwwroot);
         }
         echo '<div class="mdl-align"><p>'.get_string('paymentrequired', 'paypal').'</p>';
         echo '<div class="mdl-align"><p>'.get_string('paymentwaitremider', 'paypal').'</p>';
-        echo '<p><b>'.get_string('cost').": $instance->currency $localisedcost".'</b></p>';
+        echo '<div><p><b>'.get_string('cost').": $instance->currency $localisedcost".'</b></p></div>';
         echo '<p><a href="'.$wwwroot.'/login/">'.get_string('loginsite').'</a></p>';
         echo '</div>';
-    } else {
+    }
+    else {
         //Sanitise some fields before building the PayPal form
         $coursefullname  = format_string($course->fullname, true, array('context' => $PAGE->context));
         $courseshortname = $course->shortname;
@@ -123,49 +149,69 @@ if ($paymenttnx = $DB->get_record('paypal_transactions',
         $usercity        = $USER->city;
         $instancename    = $paypal->name;
 ?>
-        <p><?php print_string("paymentrequired", 'paypal') ?></p>
-        <p><b><?php echo get_string("cost").": {$paypal->currency} {$localisedcost}"; ?></b></p>
-        <p><img alt="<?php print_string('paypalaccepted', 'paypal') ?>"
-        title="<?php print_string('paypalaccepted', 'paypal') ?>"
-        src="https://www.paypal.com/en_US/i/logo/PayPal_mark_60x38.gif" /></p>
-        <p><?php print_string("paymentinstant", 'paypal') ?></p>
-        <?php
-            $paypalurl = empty($CFG->usepaypalsandbox) ? 'https://www.paypal.com/cgi-bin/webscr' : 'https://www.sandbox.paypal.com/cgi-bin/webscr';
-        ?>
-        <form action="<?php echo $paypalurl ?>" method="post">
+<div>
+    <?php
+        $paypalurl = empty($CFG->usepaypalsandbox) ? 'https://www.paypal.com/cgi-bin/webscr' : 'https://www.sandbox.paypal.com/cgi-bin/webscr';
+    ?>
 
-            <input type="hidden" name="cmd" value="_xclick" />
-            <input type="hidden" name="charset" value="utf-8" />
-            <input type="hidden" name="business" value="<?php p($paypal->businessemail)?>" />
-            <input type="hidden" name="item_name" value="<?php p($paypal->itemname) ?>" />
-            <input type="hidden" name="item_number" value="<?php p($paypal->itemnumber) ?>" />
-            <input type="hidden" name="quantity" value="1" />
-            <input type="hidden" name="on0" value="<?php print_string("user") ?>" />
-            <input type="hidden" name="os0" value="<?php p($userfullname) ?>" />
-            <input type="hidden" name="custom" value="<?php echo "{$USER->id}-{$course->id}-{$paypal->id}" ?>" />
+    <form action="<?php echo $paypalurl ?>" method="post">
 
-            <input type="hidden" name="currency_code" value="<?php p($paypal->currency) ?>" />
-            <input type="hidden" name="amount" value="<?php p($cost) ?>" />
+        <input type="hidden" name="cmd" value="_xclick" />
+        <input type="hidden" name="charset" value="utf-8" />
+        <input type="hidden" name="business" value="<?php p($paypal->businessemail)?>" />
+        <input type="hidden" name="item_name" value="<?php p($paypal->itemname) ?>" />
+        <input type="hidden" name="item_number" value="<?php p($paypal->itemnumber) ?>" />
+        <input type="hidden" name="quantity" value="1" />
+        <input type="hidden" name="on0" value="<?php print_string("user") ?>" />
+        <input type="hidden" name="os0" value="<?php p($userfullname) ?>" />
+        <input type="hidden" name="custom" value="<?php echo "{$USER->id}-{$course->id}-{$paypal->id}" ?>" />
 
-            <input type="hidden" name="for_auction" value="false" />
-            <input type="hidden" name="no_note" value="1" />
-            <input type="hidden" name="no_shipping" value="1" />
-            <input type="hidden" name="notify_url" value="<?php echo "{$CFG->wwwroot}/mod/paypal/ipn.php" ?>" />
-            <input type="hidden" name="return" value="<?php echo "{$CFG->wwwroot}/mod/paypal/view.php?id={$id}" ?>" />
-            <input type="hidden" name="cancel_return" value="<?php echo "{$CFG->wwwroot}/mod/paypal/view.php?id={$id}" ?>" />
-            <input type="hidden" name="rm" value="2" />
-            <input type="hidden" name="cbt" value="<?php print_string("continuetocourse") ?>" />
+        <input type="hidden" name="currency_code" value="<?php p($paypal->currency) ?>" />
+        <input type="hidden" name="amount" value="<?php p($cost) ?>" />
 
-            <input type="hidden" name="first_name" value="<?php p($userfirstname) ?>" />
-            <input type="hidden" name="last_name" value="<?php p($userlastname) ?>" />
-            <input type="hidden" name="address" value="<?php p($useraddress) ?>" />
-            <input type="hidden" name="city" value="<?php p($usercity) ?>" />
-            <input type="hidden" name="email" value="<?php p($USER->email) ?>" />
-            <input type="hidden" name="country" value="<?php p($USER->country) ?>" />
+        <input type="hidden" name="for_auction" value="false" />
+        <input type="hidden" name="no_note" value="1" />
+        <input type="hidden" name="no_shipping" value="1" />
+        <input type="hidden" name="notify_url" value="<?php echo "{$CFG->wwwroot}/mod/paypal/ipn.php" ?>" />
+        <input type="hidden" name="return" value="<?php echo "{$CFG->wwwroot}/mod/paypal/view.php?id={$id}" ?>" />
+        <input type="hidden" name="cancel_return" value="<?php echo "{$CFG->wwwroot}/mod/paypal/view.php?id={$id}" ?>" />
+        <input type="hidden" name="rm" value="2" />
+        <input type="hidden" name="cbt" value="<?php print_string("continuetocourse") ?>" />
 
-            <input type="submit" value="<?php print_string("sendpaymentbutton", "paypal") ?>" />
+        <input type="hidden" name="first_name" value="<?php p($userfirstname) ?>" />
+        <input type="hidden" name="last_name" value="<?php p($userlastname) ?>" />
+        <input type="hidden" name="address" value="<?php p($useraddress) ?>" />
+        <input type="hidden" name="city" value="<?php p($usercity) ?>" />
+        <input type="hidden" name="email" value="<?php p($USER->email) ?>" />
+        <input type="hidden" name="country" value="<?php p($USER->country) ?>" />
 
-        </form>
+        <!--<input type="submit" class="paymentbutton" value="<?php print_string("sendpaymentbutton", "paypal") ?>" />-->
+        <button type="submit" name="submit" id="paypalbtn">
+            <i class="fa fa-shopping-cart"></i>&nbsp;&nbsp;PAY <?php echo " $$localisedcost" ?>
+        </button>
+    </form>
+    <div id="cardwrapper">
+        <span id="title">payments accepted</span>
+        <i class="fa fa-cc-paypal fa-2x" aria-hidden="true"></i>
+        <i class="fa fa-cc-visa fa-2x" aria-hidden="true"></i>
+        <i class="fa fa-cc-mastercard fa-2x" aria-hidden="true"></i>
+        <i class="fa fa-cc-amex fa-2x" aria-hidden="true"></i>
+        <i class="fa fa-cc-discover fa-2x" aria-hidden="true"></i>
+    </div>
+</div>
+<p>&nbsp;</p>
+<hr />
+<?php // SEBTS show message that should disappear if payment is complete ?>
+<p>
+    <b>NOTE:</b> If you have made your payment and this message is still visible, your payment is still processing. Please wait a few moments and click the button below.
+    <br />
+    <br />
+    <button class="btn btn-info" onclick="location.reload()">
+        <i class="fa fa-refresh"></i>&nbsp;&nbsp;Refresh Payment Status
+    </button>
+</p>
+<hr />
+<p>&nbsp;</p>
 <?php
     }
 }

@@ -33,6 +33,7 @@ require("../../config.php");
 require_once("lib.php");
 require_once($CFG->libdir.'/eventslib.php');
 require_once($CFG->libdir . '/filelib.php');
+require_once($CFG->libdir . '/completionlib.php');
 
 // PayPal does not like when we return error messages here,
 // the custom handler just logs exceptions and stops.
@@ -127,6 +128,12 @@ if (!$result) {  /// Could not connect to PayPal - FAIL
 
 if (strlen($result) > 0) {
     if (strcmp($result, "VERIFIED") == 0) {          // VALID PAYMENT!
+        
+        // Make sure this transaction doesn't exist already.
+        if ($existing = $DB->get_record("paypal_transactions", array("txn_id"=>$data->txn_id))) {
+            paypal_message_error_to_admin("Transaction $data->txn_id is being repeated!", $data);
+            die;
+        }
 
         $DB->insert_record("paypal_transactions", $data);
 
@@ -170,12 +177,6 @@ if (strlen($result) > 0) {
 
         // At this point we only proceed with a status of completed or pending with a reason of echeck.
 
-        // Make sure this transaction doesn't exist already.
-        if ($existing = $DB->get_record("paypal_transactions", array("txn_id"=>$data->txn_id))) {
-            paypal_message_error_to_admin("Transaction $data->txn_id is being repeated!", $data);
-            die;
-        }
-
         // Check that the email is the one we want it to be.
         if (core_text::strtolower($data->business) !== core_text::strtolower($plugininstance->businessemail)) {
             paypal_message_error_to_admin("Business email is {$data->business} (not ".
@@ -218,7 +219,7 @@ if (strlen($result) > 0) {
         if ($data->payment_status == 'Completed') {
             $completion = new completion_info($course);
             if ($completion->is_enabled($cm) && $plugininstance->paymentcompletionenabled ) {
-                $completion->update_state($cm, COMPLETION_COMPLETE);
+                $completion->update_state($cm, COMPLETION_COMPLETE,$data->userid);
             }
         }
 
